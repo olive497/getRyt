@@ -1,5 +1,6 @@
 require('dotenv/config');
 
+const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 
@@ -23,6 +24,7 @@ app.use((err, _req, res, next) => {
 
 app.use(verifyRouter);
 app.use(webhookRouter);
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="getRyt helps people check common misinformation claims using verified sources."
+    />
+    <title>getRyt | Check a claim</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-labelledby="app-title">
+      <section class="phone-frame" aria-label="getRyt fact-checking chat">
+        <header class="chat-header">
+          <div class="brand-mark" aria-hidden="true">✓</div>
+          <div>
+            <p class="eyebrow">VERIFIED BY GETRYT</p>
+            <h1 id="app-title">getRyt</h1>
+            <p class="status"><span></span> Here to help you stay safe</p>
+          </div>
+        </header>
+
+        <div
+          id="chatMessages"
+          class="chat-messages"
+          role="log"
+          aria-live="polite"
+          aria-label="Fact-check conversation"
+        >
+          <article class="message message--bot">
+            <p>Hi there! I’m getRyt, your fact-checker 🌟</p>
+            <p>Send me a claim and I’ll check it against our verified demo sources.</p>
+          </article>
+
+          <section class="quick-checks" aria-label="Try a demo claim">
+            <p>Try a demo claim</p>
+            <div class="quick-checks__grid">
+              <button type="button" data-claim="Do I need to pay a fee to apply for NSFAS?">NSFAS fees</button>
+              <button type="button" data-claim="Antibiotics cure flu.">Antibiotics and flu</button>
+              <button type="button" data-claim="You can vote without registering.">Voting registration</button>
+              <button type="button" data-claim="People can demand proof of nationality in the street.">Nationality rumours</button>
+            </div>
+          </section>
+        </div>
+
+        <form id="claimForm" class="composer">
+          <label class="sr-only" for="claimInput">Type a claim to check</label>
+          <textarea
+            id="claimInput"
+            name="claim"
+            rows="2"
+            maxlength="2000"
+            placeholder="Type or paste a message to check…"
+            required
+          ></textarea>
+          <button id="sendButton" type="submit" aria-label="Check this claim">Check</button>
+        </form>
+
+        <p class="privacy-note">Demo only. getRyt does not store this chat in your browser.</p>
+      </section>
+    </main>
+
+    <template id="userMessageTemplate">
+      <article class="message message--user"><p></p></article>
+    </template>
+
+    <template id="resultTemplate">
+      <article class="message message--bot result-card">
+        <div class="result-card__topline">
+          <span class="verdict-badge"></span>
+          <span class="confidence"></span>
+        </div>
+        <p class="result-card__explanation"></p>
+        <p class="result-card__action"></p>
+        <ul class="result-card__sources" aria-label="Verified sources"></ul>
+      </article>
+    </template>
+
+    <template id="errorTemplate">
+      <article class="message message--bot message--error">
+        <p>⚠️ I could not check that right now. Please try again in a moment.</p>
+      </article>
+    </template>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
