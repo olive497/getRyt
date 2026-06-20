@@ -1,29 +1,67 @@
 const OpenAI = require('openai');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const VALID_VERDICTS = new Set([
+  'true',
+  'false',
+  'misleading',
+  'unverified',
+]);
 
-const SYSTEM_PROMPT = `You are a misinformation detection assistant. Analyze the user's claim and respond ONLY with a valid JSON object (no markdown, no backticks) using this exact schema:
+const SYSTEM_PROMPT = `
+You are a misinformation detection assistant.
+
+Analyze the user's claim and respond only with a valid JSON object using this schema:
+
 {
   "verdict": "true" | "false" | "misleading" | "unverified",
-  "riskScore": number between 1 and 100,
+  "riskScore": number,
   "explanation": "2-3 sentence explanation",
   "sources": ["source1", "source2"]
 }
 
-Categories and risk ranges:
-- False/scam claims: riskScore 81-100, verdict "false"
-- Misleading/exaggerated: riskScore 41-80, verdict "misleading"
-- Unverified/unclear: riskScore 11-40, verdict "unverified"
-- True/verified: riskScore 1-10, verdict "true"
+Focus on financial scams, health misinformation, xenophobic rumours, and conspiracy theories.
+Do not invent sources.
+`;
 
-Focus on: financial scams, health misinformation, xenophobic rumors, conspiracy theories. Be objective. Cite general sources (e.g., "WHO", "FTC", "Reuters", "CDC").`;
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return null;
+  }
+
+  return new OpenAI({ apiKey });
+}
+
+function normalizeResult(parsed) {
+  return {
+    verdict: VALID_VERDICTS.has(parsed.verdict)
+      ? parsed.verdict
+      : 'unverified',
+    riskScore: Math.min(100, Math.max(1, Math.round(parsed.riskScore || 50))),
+    explanation: parsed.explanation || 'No explanation provided.',
+    sources: Array.isArray(parsed.sources) ? parsed.sources.slice(0, 5) : [],
+  };
+}
 
 async function analyzeMessage(userText) {
   if (!userText || userText.trim().length < 3) {
     return {
       verdict: 'unverified',
       riskScore: 1,
-      explanation: 'Message too short to analyze.',
+      explanation: 'Message is too short to analyse.',
+      sources: [],
+    };
+  }
+
+  const openai = getOpenAIClient();
+
+  if (!openai) {
+    return {
+      verdict: 'unverified',
+      riskScore: 50,
+      explanation:
+        'AI analysis is not configured. This demo can still verify claims from the local evidence pack.',
       sources: [],
     };
   }
@@ -32,34 +70,42 @@ async function analyzeMessage(userText) {
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userText },
+        {
+          role: 'system',
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: 'user',
+          content: userText,
+        },
       ],
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_object',
+      },
       temperature: 0.1,
       max_tokens: 500,
     });
 
     const raw = completion.choices[0]?.message?.content;
-    if (!raw) throw new Error('Empty LLM response');
 
-    const parsed = JSON.parse(raw);
-    return {
-      verdict: ['true', 'false', 'misleading', 'unverified'].includes(parsed.verdict)
-        ? parsed.verdict : 'unverified',
-      riskScore: Math.min(100, Math.max(1, Math.round(parsed.riskScore))),
-      explanation: parsed.explanation || 'No explanation provided.',
-      sources: Array.isArray(parsed.sources) ? parsed.sources.slice(0, 5) : [],
-    };
-  } catch (err) {
-    console.error('[LLM_ERROR]', err.message);
+    if (!raw) {
+      throw new Error('Empty LLM response.');
+    }
+
+    return normalizeResult(JSON.parse(raw));
+  } catch (error) {
+    console.error('[LLM_ERROR]', error.message);
+
     return {
       verdict: 'unverified',
       riskScore: 50,
-      explanation: err.message,
+      explanation:
+        'We could not analyse this claim right now. Please check a trusted source before sharing it.',
       sources: [],
     };
   }
 }
 
-module.exports = { analyzeMessage };
+module.exports = {
+  analyzeMessage,
+};

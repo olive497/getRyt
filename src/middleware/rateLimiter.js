@@ -1,11 +1,9 @@
 const rateLimit = require('express-rate-limit');
 
-const webhookRateLimiter = rateLimit({
+const verificationRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  keyGenerator: (req) => {
-    return req.body?.From || req.ip;
-  },
+  keyGenerator: (req) => req.body?.userId || req.body?.From || req.ip,
   handler: (_req, res) => {
     res.status(429).json({
       error: 'Too many requests. Limit: 30 per minute per user.',
@@ -15,4 +13,4 @@ const webhookRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = webhookRateLimiter;
+module.exports = verificationRateLimiter;
