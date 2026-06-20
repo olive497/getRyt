@@ -1,0 +1,18 @@
+{
+  "name": "getryt-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "getRyt WhatsApp bot backend - misinformation detection",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.1",
+    "openai": "^4.67.0",
+    "helmet": "^7.1.0",
+    "dotenv": "^16.4.5"
+  }
+}
