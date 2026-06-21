@@ -3,16 +3,23 @@ require('dotenv/config');
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
-
 const verifyRouter = require('./routes/verify');
 const webhookRouter = require('./routes/webhook');
+const whatsappWebhookRouter = require('./routes/whatsappWebhook');
 const { errorHandler } = require('./utils/errors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
-app.use(express.json({ limit: '4kb' }));
+app.use(
+  express.json({
+    limit: '4kb',
+    verify: (req, _res, buffer) => {
+      req.rawBody = Buffer.from(buffer);
+    },
+  }),
+);
 
 app.use((err, _req, res, next) => {
   if (err instanceof SyntaxError && err.type === 'entity.parse.failed') {
@@ -23,7 +30,8 @@ app.use((err, _req, res, next) => {
 });
 
 app.use('/verify', verifyRouter);
-app.use(webhookRouter);
+app.use('/webhook', webhookRouter);
+app.use('/webhooks/whatsapp', whatsappWebhookRouter);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', (_req, res) => {
