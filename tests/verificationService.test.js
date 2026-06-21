@@ -7,24 +7,27 @@ const {
 } = require('../src/services/verificationService');
 const {
   parseModelSelection,
-} = require('../src/services/geminiSemanticMatcher');
+} = require('../src/services/groqSemanticMatcher');
 
 test('normalizes punctuation and whitespace', () => {
   assert.equal(
-    normalizeText('  NSFAS — APPLICATION fee?!  '),
+    normalizeText(' NSFAS — APPLICATION fee?! '),
     'nsfas application fee',
   );
 });
 
-test('returns local evidence before calling a semantic matcher', async () => {
+test('returns local evidence before calling the semantic matcher', async () => {
   let matcherCalled = false;
 
-  const result = await verifyClaim('Do I need to pay a fee to apply for NSFAS?', {
-    semanticMatcher: async () => {
-      matcherCalled = true;
-      return null;
+  const result = await verifyClaim(
+    'Do I need to pay a fee to apply for NSFAS?',
+    {
+      semanticMatcher: async () => {
+        matcherCalled = true;
+        return null;
+      },
     },
-  });
+  );
 
   assert.equal(result.verdict, 'false');
   assert.equal(result.matchedClaimId, 'nsfas-application-fee');
@@ -32,9 +35,9 @@ test('returns local evidence before calling a semantic matcher', async () => {
   assert.equal(matcherCalled, false);
 });
 
-test('accepts a valid high-confidence Gemini selection only from approved IDs', async () => {
+test('accepts an approved high-confidence Groq selection', async () => {
   const result = await verifyClaim(
-    'Someone told me I must pay R250 before NSFAS will process my application.',
+    'Someone told me I must send R250 before NSFAS will process my application.',
     {
       semanticMatcher: async () => ({
         matchedClaimId: 'nsfas-application-fee',
@@ -49,7 +52,7 @@ test('accepts a valid high-confidence Gemini selection only from approved IDs', 
   assert.equal(result.sources.length, 1);
 });
 
-test('returns unverified when semantic matcher has no approved match', async () => {
+test('returns unverified when no semantic match is accepted', async () => {
   const result = await verifyClaim('Blue tea doubles your exam marks.', {
     semanticMatcher: async () => null,
   });
@@ -60,7 +63,7 @@ test('returns unverified when semantic matcher has no approved match', async () 
   assert.deepEqual(result.sources, []);
 });
 
-test('rejects invalid or low-confidence model selections', () => {
+test('rejects unknown, malformed, and low-confidence model selections', () => {
   const allowedIds = new Set(['nsfas-application-fee']);
 
   assert.equal(
@@ -78,4 +81,23 @@ test('rejects invalid or low-confidence model selections', () => {
     ),
     null,
   );
+
+  assert.equal(parseModelSelection('not json', allowedIds), null);
+});
+
+test('returns an input-too-short response without calling the matcher', async () => {
+  let matcherCalled = false;
+
+  const result = await verifyClaim('ok', {
+    semanticMatcher: async () => {
+      matcherCalled = true;
+      return {
+        matchedClaimId: 'nsfas-application-fee',
+        confidence: 0.99,
+      };
+    },
+  });
+
+  assert.equal(result.matchType, 'input_too_short');
+  assert.equal(matcherCalled, false);
 });

@@ -1,7 +1,7 @@
 const { verifiedClaims } = require('../data/verifiedClaims');
 const {
-  selectEvidenceMatchWithGemini,
-} = require('./geminiSemanticMatcher');
+  selectEvidenceMatchWithGroq,
+} = require('./groqSemanticMatcher');
 
 function normalizeText(value) {
   return value
@@ -41,7 +41,7 @@ function buildUnverifiedResult(claim, matchType = 'no_verified_match') {
   };
 }
 
-function findDeterministicMatch(normalizedClaim) {
+function findExactEvidenceMatch(normalizedClaim) {
   return verifiedClaims.find((entry) =>
     entry.matchPhrases.some((phrase) =>
       normalizedClaim.includes(normalizeText(phrase)),
@@ -49,13 +49,10 @@ function findDeterministicMatch(normalizedClaim) {
   );
 }
 
-/**
- * Verification order:
- * 1. Exact local phrase match.
- * 2. Optional Gemini semantic selection from the same approved evidence IDs.
- * 3. Honest unverified fallback.
- */
-async function verifyClaim(claim, options = {}) {
+async function verifyClaim(
+  claim,
+  { semanticMatcher = selectEvidenceMatchWithGroq } = {},
+) {
   const normalizedClaim = normalizeText(claim);
 
   if (normalizedClaim.length < 3) {
@@ -72,14 +69,12 @@ async function verifyClaim(claim, options = {}) {
     };
   }
 
-  const exactMatch = findDeterministicMatch(normalizedClaim);
+  const exactMatch = findExactEvidenceMatch(normalizedClaim);
 
   if (exactMatch) {
     return buildResult(claim, exactMatch, 'verified_evidence_match');
   }
 
-  const semanticMatcher =
-    options.semanticMatcher || selectEvidenceMatchWithGemini;
   const semanticSelection = await semanticMatcher({
     claim,
     candidates: verifiedClaims,
@@ -99,8 +94,9 @@ async function verifyClaim(claim, options = {}) {
 }
 
 module.exports = {
+  buildResult,
   buildUnverifiedResult,
-  findDeterministicMatch,
+  findExactEvidenceMatch,
   normalizeText,
   verifyClaim,
 };

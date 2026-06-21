@@ -1,29 +1,28 @@
-const express = require('express');
+const { Router } = require('express');
+const sanitizeInput = require('../middleware/sanitizer');
+const webhookRateLimiter = require('../middleware/rateLimiter');
+const { AppError, asyncHandler } = require('../utils/errors');
 const { verifyClaim } = require('../services/verificationService');
 
-const router = express.Router();
+const router = Router();
 
-router.post('/', async (req, res, next) => {
-  try {
-    const body = typeof req.body?.Body === 'string' ? req.body.Body.trim() : '';
-    const from = typeof req.body?.From === 'string' ? req.body.From.trim() : '';
+router.post(
+  '/webhook',
+  webhookRateLimiter,
+  sanitizeInput,
+  asyncHandler(async (req, res) => {
+    const { Body, From } = req.body;
 
-    if (!body) {
-      return res.status(400).json({
-        error: 'invalid_request',
-        message: 'Please send a message for getRyt to check.',
-      });
+    if (!Body || typeof Body !== 'string' || Body.trim().length === 0) {
+      throw new AppError('Message body is required.', 400);
     }
 
-    const result = await verifyClaim(body);
+    if (!From || typeof From !== 'string') {
+      throw new AppError('Sender identifier (From) is required.', 400);
+    }
 
-    return res.status(200).json({
-      from: from || null,
-      ...result,
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+    res.json(await verifyClaim(Body));
+  }),
+);
 
 module.exports = router;
