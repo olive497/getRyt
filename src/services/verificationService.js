@@ -1,4 +1,7 @@
 const { verifiedClaims } = require('../data/verifiedClaims');
+const {
+  selectEvidenceMatchWithGemini,
+} = require('./geminiSemanticMatcher');
 
 function normalizeText(value) {
   return value
@@ -8,7 +11,7 @@ function normalizeText(value) {
     .trim();
 }
 
-function buildResult(claim, match) {
+function buildResult(claim, match, matchType) {
   return {
     claim,
     verdict: match.verdict,
@@ -18,11 +21,41 @@ function buildResult(claim, match) {
     sources: match.sources,
     category: match.category,
     matchedClaimId: match.id,
-    matchType: 'verified_evidence_match',
+    matchType,
   };
 }
 
-function verifyClaim(claim) {
+function buildUnverifiedResult(claim, matchType = 'no_verified_match') {
+  return {
+    claim,
+    verdict: 'unverified',
+    riskScore: 25,
+    explanation:
+      'getRyt does not have enough verified evidence for this claim yet. Please do not share it as fact.',
+    safeAction:
+      'Check the original source, look for an official statement, or send a different claim from the demo topics.',
+    sources: [],
+    category: 'unknown',
+    matchedClaimId: null,
+    matchType,
+  };
+}
+
+function findDeterministicMatch(normalizedClaim) {
+  return verifiedClaims.find((entry) =>
+    entry.matchPhrases.some((phrase) =>
+      normalizedClaim.includes(normalizeText(phrase)),
+    ),
+  );
+}
+
+/**
+ * Verification order:
+ * 1. Exact local phrase match.
+ * 2. Optional Gemini semantic selection from the same approved evidence IDs.
+ * 3. Honest unverified fallback.
+ */
+async function verifyClaim(claim, options = {}) {
   const normalizedClaim = normalizeText(claim);
 
   if (normalizedClaim.length < 3) {
@@ -39,32 +72,35 @@ function verifyClaim(claim) {
     };
   }
 
-  const match = verifiedClaims.find((entry) =>
-    entry.matchPhrases.some((phrase) =>
-      normalizedClaim.includes(normalizeText(phrase)),
-    ),
-  );
+  const exactMatch = findDeterministicMatch(normalizedClaim);
 
-  if (match) {
-    return buildResult(claim, match);
+  if (exactMatch) {
+    return buildResult(claim, exactMatch, 'verified_evidence_match');
   }
 
-  return {
+  const semanticMatcher =
+    options.semanticMatcher || selectEvidenceMatchWithGemini;
+  const semanticSelection = await semanticMatcher({
     claim,
-    verdict: 'unverified',
-    riskScore: 25,
-    explanation:
-      'getRyt does not have enough verified evidence for this claim yet. Please do not share it as fact.',
-    safeAction:
-      'Check the original source, look for an official statement, or send a different claim from the demo topics.',
-    sources: [],
-    category: 'unknown',
-    matchedClaimId: null,
-    matchType: 'no_verified_match',
-  };
+    candidates: verifiedClaims,
+  });
+
+  if (semanticSelection?.matchedClaimId) {
+    const semanticMatch = verifiedClaims.find(
+      (entry) => entry.id === semanticSelection.matchedClaimId,
+    );
+
+    if (semanticMatch) {
+      return buildResult(claim, semanticMatch, 'semantic_evidence_match');
+    }
+  }
+
+  return buildUnverifiedResult(claim);
 }
 
 module.exports = {
+  buildUnverifiedResult,
+  findDeterministicMatch,
   normalizeText,
   verifyClaim,
 };

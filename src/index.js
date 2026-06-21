@@ -22,7 +22,7 @@ app.use((err, _req, res, next) => {
   return next(err);
 });
 
-app.use(verifyRouter);
+app.use('/verify', verifyRouter);
 app.use(webhookRouter);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
