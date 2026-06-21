@@ -1,29 +1,30 @@
-const express = require('express');
+const { Router } = require('express');
+const sanitizeInput = require('../middleware/sanitizer');
+const verificationRateLimiter = require('../middleware/rateLimiter');
+const { AppError, asyncHandler } = require('../utils/errors');
 const { verifyClaim } = require('../services/verificationService');
 
-const router = express.Router();
+const router = Router();
 
-router.post('/', async (req, res, next) => {
-  try {
+router.post(
+  '/',
+  verificationRateLimiter,
+  sanitizeInput,
+  asyncHandler(async (req, res) => {
     const claim = typeof req.body?.claim === 'string' ? req.body.claim.trim() : '';
     const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
 
     if (!claim) {
-      return res.status(400).json({
-        error: 'invalid_request',
-        message: 'Please send a claim for getRyt to check.',
-      });
+      throw new AppError('Claim is required.', 400);
     }
 
     const result = await verifyClaim(claim);
 
-    return res.status(200).json({
+    res.json({
       userId: userId || null,
       ...result,
     });
-  } catch (error) {
-    return next(error);
-  }
-});
+  }),
+);
 
 module.exports = router;
