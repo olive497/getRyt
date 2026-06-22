@@ -1,4 +1,4 @@
-require('dotenv/config');
+﻿require('dotenv/config');
 
 const path = require('path');
 const express = require('express');
@@ -13,7 +13,17 @@ const { errorHandler } = require('./utils/errors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        frameAncestors: ["'self'", 'https://huggingface.co'],
+      },
+    },
+    xFrameOptions: false,
+  }),
+);
+
 app.use(
   express.json({
     limit: '4kb',
