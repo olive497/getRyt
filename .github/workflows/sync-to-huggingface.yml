@@ -1,0 +1,57 @@
+name: Test and sync getRyt to Hugging Face
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: getryt-huggingface-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  sync:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+    steps:
+      - name: Validate deployment configuration
+        id: deployment
+        shell: bash
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Hugging Face sync skipped: configure HF_TOKEN and HF_SPACE_ID first."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+        if: steps.deployment.outputs.configured == 'true'
+
+      - name: Sync source of truth to Hugging Face Space
+        if: steps.deployment.outputs.configured == 'true'
+        uses: huggingface/hub-sync@v0.2.0
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: ${{ vars.HF_SPACE_ID }}
+          hf_token: ${{ secrets.HF_TOKEN }}
+          repo_type: space
+          space_sdk: docker
+          private: false

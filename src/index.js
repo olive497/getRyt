@@ -3,9 +3,11 @@ require('dotenv/config');
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
+
 const verifyRouter = require('./routes/verify');
 const webhookRouter = require('./routes/webhook');
 const whatsappWebhookRouter = require('./routes/whatsappWebhook');
+const gameRouter = require('./routes/game');
 const { errorHandler } = require('./utils/errors');
 
 const app = express();
@@ -32,6 +34,7 @@ app.use((err, _req, res, next) => {
 app.use('/verify', verifyRouter);
 app.use('/webhook', webhookRouter);
 app.use('/webhooks/whatsapp', whatsappWebhookRouter);
+app.use('/game', gameRouter);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', (_req, res) => {
